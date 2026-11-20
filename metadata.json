@@ -1,0 +1,8 @@
+{
+  "name": "Odyssey: The Path to Ithaca",
+  "description": "An AI-powered, personalized Calculus I survival platformer adventure with KaTeX math, spaced repetition, realistic Mediterranean environments, and a social study community.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

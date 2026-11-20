@@ -1,0 +1,217 @@
+Level 1 Basic computer terminology
+
+1. What is the difference between hardware and software? Give one example of each.
+
+____________________________________________________________________
+
+2. What does CPU stand for, and what does it do?
+
+____________________________________________________________________
+
+3. What is RAM, and how is it different from storage on an SSD or hard drive?
+
+____________________________________________________________________
+
+4. What is an operating system? Name two examples.
+
+____________________________________________________________________
+
+5. What is the difference between a file and a folder?
+
+____________________________________________________________________
+
+6. What does a file extension, such as .pdf, .jpg, or .py, tell you?
+
+____________________________________________________________________
+
+
+Hackathon UTA  |  
+
+Level 2 How computers and programs work
+
+7. What is the difference between a web browser and a search engine?
+
+____________________________________________________________________
+
+8. What does it mean to download a file versus upload a file?
+
+____________________________________________________________________
+
+9. What is a computer program?
+
+____________________________________________________________________
+
+10. What is an algorithm? Describe an everyday task as a sequence of instructions.
+
+____________________________________________________________________
+
+11. What is a variable in programming?
+
+____________________________________________________________________
+
+12. What is a bug, and what does debugging mean?
+
+____________________________________________________________________
+
+
+Hackathon UTA  |  
+
+Level 3 Reading basic Python
+
+13. What does this program display?
+
+print("Hello, UTA!")
+
+____________________________________________________________________
+
+14. What are the data types of these four values?
+
+name = "Alex"
+age = 20
+price = 12.50
+is_student = True
+
+____________________________________________________________________
+
+15. What does this program display?
+
+score = 10
+score = score + 5
+print(score)
+
+____________________________________________________________________
+
+16. What is the difference between = and == in Python?
+
+____________________________________________________________________
+
+17. What does this program display, and why?
+
+print(5 + 3)
+print("5" + "3")
+
+____________________________________________________________________
+
+18. What type of value does Python’s input() function return?
+
+____________________________________________________________________
+
+
+Hackathon UTA  |  
+
+Level 4 Conditions loops and functions
+
+19. What does this program display?
+
+temperature = 75
+
+if temperature > 80:
+    print("Hot")
+else:
+    print("Not hot")
+
+____________________________________________________________________
+
+20. What numbers does this loop display?
+
+for number in range(4):
+    print(number)
+
+____________________________________________________________________
+
+21. How many times does this loop run, and what does it display?
+
+count = 1
+
+while count <= 3:
+    print(count)
+    count = count + 1
+
+____________________________________________________________________
+
+
+Hackathon UTA  |  
+
+Level 4 Continued
+
+22. What does this program display? Explain what the index 1 means.
+
+colors = ["red", "blue", "green"]
+print(colors[1])
+
+____________________________________________________________________
+
+23. What is the purpose of return in this function, and what does the program display?
+
+def add(a, b):
+    return a + b
+
+result = add(4, 6)
+print(result)
+
+____________________________________________________________________
+
+24. What is the difference between a syntax error, a runtime error, and a logic error?
+
+____________________________________________________________________
+
+
+Hackathon UTA  |  
+
+Level 5 Basic Python debugging
+
+Identify the problem, explain why it happens, and rewrite the code correctly.
+
+25. This program should greet the user, but it produces a syntax error.
+
+print("Welcome to the hackathon!"
+
+____________________________________________________________________
+
+26. This program should print a student’s name, but it produces a NameError.
+
+student_name = "Jordan"
+print(studentname)
+
+____________________________________________________________________
+
+27. This program should print "You passed!", but it has two syntax-related problems. Find both.
+
+score = 85
+
+if score >= 70
+print("You passed!")
+
+____________________________________________________________________
+
+
+Hackathon UTA  |  
+
+Level 5 Continued
+
+Identify the problem, explain why it happens, and rewrite the code correctly.
+
+28. The user enters 20. This program should display 21, but it produces a TypeError.
+
+age = input("Enter your age: ")
+next_year = age + 1
+print(next_year)
+
+____________________________________________________________________
+
+29. This program should print the last item in the list, but it produces an IndexError.
+
+languages = ["Python", "Java", "C++"]
+print(languages[3])
+
+____________________________________________________________________
+
+30. This program should display the numbers 1 through 5, then stop. Instead, it keeps displaying the same number.
+
+number = 1
+
+while number <= 5:
+    print(number)
+
+____________________________________________________________________
+

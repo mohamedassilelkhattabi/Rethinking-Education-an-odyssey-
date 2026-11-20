@@ -36,13 +36,20 @@ function formatTimeShort(ts: number): string {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
+export interface PrefillIntuitionDraft {
+  id: number;
+  text: string;
+  latex?: string;
+}
+
 interface SocialDrawerProps {
   repo: SocialRepository;
   open: boolean;
   onClose: () => void;
+  prefillDraft?: PrefillIntuitionDraft | null;
 }
 
-export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
+export function SocialDrawer({ repo, open, onClose, prefillDraft }: SocialDrawerProps) {
   const social = useSyncExternalStore(repo.subscribe, repo.getState, repo.getState);
   const [tab, setTab] = useState<HubTab>('groups');
   const [activeRoomId, setActiveRoomId] = useState<string>('room-related-rates');
@@ -52,7 +59,7 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
   // Create room form
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomDesc, setNewRoomDesc] = useState('');
-  const [newRoomCategory, setNewRoomCategory] = useState('Unit 3 · Derivatives');
+  const [newRoomCategory, setNewRoomCategory] = useState('Realm III · Derivatives');
   const [newRoomPrivate, setNewRoomPrivate] = useState(false);
 
   // Composer state
@@ -67,6 +74,7 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastPrefillIdRef = useRef<number | null>(null);
 
   const userMap = useMemo(() => {
     const m = new Map<string, SocialUser>();
@@ -77,10 +85,28 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
 
   const groupRooms = useMemo(() => social.rooms.filter((r) => r.kind === 'group'), [social.rooms]);
   const dmRooms = useMemo(() => social.rooms.filter((r) => r.kind === 'dm'), [social.rooms]);
-  const activeRoom = useMemo(() => social.rooms.find((r) => r.id === activeRoomId) ?? social.rooms[0], [social.rooms, activeRoomId]);
-  const activeMessages = useMemo(() => (activeRoom ? social.messages[activeRoom.id] ?? [] : []), [social.messages, activeRoom]);
+  const activeRoom = useMemo(
+    () => social.rooms.find((r) => r.id === activeRoomId) ?? social.rooms[0],
+    [social.rooms, activeRoomId],
+  );
+  const activeMessages = useMemo(
+    () => (activeRoom ? social.messages[activeRoom.id] ?? [] : []),
+    [social.messages, activeRoom],
+  );
 
-  // Tick every 500ms while open so active ephemeral snaps count down live.
+  // Hydrate composer when Stage 6 "Share Your Intuition" triggers the drawer
+  useEffect(() => {
+    if (open && prefillDraft && prefillDraft.id !== lastPrefillIdRef.current) {
+      lastPrefillIdRef.current = prefillDraft.id;
+      setTab('groups');
+      setDraftText(prefillDraft.text);
+      if (prefillDraft.latex) {
+        setDraftLatex(prefillDraft.latex);
+        setShowLatexBar(true);
+      }
+    }
+  }, [open, prefillDraft]);
+
   useEffect(() => {
     if (!open) return;
     const id = window.setInterval(() => setNowTick(Date.now()), 500);
@@ -177,8 +203,8 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
           type="button"
           disabled={isMe || !sender}
           onClick={() => sender && !isMe && setSelectedPeer(sender)}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white disabled:cursor-default"
-          style={{ backgroundColor: sender?.avatarColor ?? '#3b4a5e' }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-[#FAF6EC] disabled:cursor-default"
+          style={{ backgroundColor: sender?.avatarColor ?? 'var(--accent-primary)' }}
           title={isMe ? 'You' : `View ${sender?.name}'s profile`}
         >
           {sender?.initials ?? '?'}
@@ -190,22 +216,22 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
               <button
                 type="button"
                 onClick={() => setSelectedPeer(sender)}
-                className="font-semibold text-[#f1d49a] hover:underline"
+                className="font-semibold text-[var(--accent-gold)] hover:underline"
               >
                 {sender.name}
               </button>
             ) : (
-              <span className="font-semibold text-[#5fb8c4]">{sender?.name ?? 'You'}</span>
+              <span className="font-semibold text-[var(--accent-primary)]">{sender?.name ?? 'You'}</span>
             )}
-            <span className="text-[#8ba0b8]">{formatTimeShort(msg.createdAt)}</span>
+            <span className="text-[var(--text-secondary)]">{formatTimeShort(msg.createdAt)}</span>
           </div>
 
           <div
-            className={`rounded-xl border px-3 py-2 text-left text-sm leading-relaxed ${
-              isMe
-                ? 'border-[#5fb8c4]/40 bg-[#183548] text-[#eef9fc]'
-                : 'border-[#d8af63]/20 bg-[#152033] text-[#f2e8cf]'
-            }`}
+            className="rounded-xl border px-3.5 py-2.5 text-left text-sm leading-relaxed text-[var(--text-primary)]"
+            style={{
+              backgroundColor: isMe ? 'var(--accent-primary-soft)' : 'var(--bg-elevated)',
+              borderColor: isMe ? 'var(--accent-primary)' : 'var(--border-hairline)',
+            }}
           >
             {msg.text && (
               <p className="whitespace-pre-wrap break-words">
@@ -214,15 +240,15 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
             )}
 
             {msg.latexSnippet && (
-              <div className="mt-2 overflow-x-auto rounded-lg border border-[#d8af63]/25 bg-[#0b1320] px-3 py-2 text-center text-[#f7ebd0]">
+              <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-center text-[var(--text-primary)]">
                 <MathText text={`$$${msg.latexSnippet}$$`} />
               </div>
             )}
 
             {msg.youtubeId && (
-              <div className="mt-2 overflow-hidden rounded-lg border border-[#d8af63]/25 bg-black">
-                <div className="flex items-center gap-1.5 bg-[#101a2a] px-2.5 py-1 text-[11px] text-[#c9b98a]">
-                  <Video className="h-3.5 w-3.5 text-[#ff6b5a]" aria-hidden /> Embedded YouTube Clip
+              <div className="mt-2 overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-[#1A1916]">
+                <div className="flex items-center gap-1.5 bg-[var(--bg-surface)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
+                  <Video className="h-3.5 w-3.5 text-[var(--accent-terracotta)]" aria-hidden /> Embedded YouTube Clip
                 </div>
                 <iframe
                   title={`YouTube video ${msg.youtubeId}`}
@@ -239,14 +265,14 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                 href={msg.linkPreview.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 block rounded-lg border border-[#5fb8c4]/30 bg-[#0d1828] p-2.5 transition hover:border-[#5fb8c4]"
+                className="mt-2 block rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] p-2.5 transition hover:border-[var(--accent-primary)]"
               >
-                <p className="flex items-center justify-between text-[11px] font-semibold text-[#5fb8c4]">
+                <p className="flex items-center justify-between text-[11px] font-semibold text-[var(--accent-primary)]">
                   <span>{msg.linkPreview.domain}</span>
                   <ExternalLink className="h-3 w-3" aria-hidden />
                 </p>
-                <p className="mt-0.5 text-xs font-bold text-[#f5ebd2]">{msg.linkPreview.title}</p>
-                <p className="mt-0.5 text-[11px] text-[#9eb4ca]">{msg.linkPreview.description}</p>
+                <p className="mt-0.5 text-xs font-semibold text-[var(--text-primary)]">{msg.linkPreview.title}</p>
+                <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{msg.linkPreview.description}</p>
               </a>
             )}
 
@@ -254,23 +280,24 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
               <div className="mt-2">
                 {att.snapSeconds ? (
                   expired ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-[#d8af63]/20 bg-[#0b1320] px-3 py-2 text-xs text-[#8ba0b8]">
+                    <div className="flex items-center gap-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-xs text-[var(--text-secondary)]">
                       <Timer className="h-4 w-4" aria-hidden /> Ephemeral snap expired ({att.snapSeconds}s)
                     </div>
                   ) : !att.openedAt ? (
                     <button
                       type="button"
                       onClick={() => repo.openSnap(msg.roomId, msg.id)}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#ff7e6b]/50 bg-[#2b1520] px-3 py-2.5 text-xs font-bold text-[#ffd6cf] hover:bg-[#3a1c2b]"
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--accent-terracotta)] bg-[var(--accent-terracotta-soft)] px-3 py-2.5 text-xs font-semibold text-[var(--text-primary)]"
                     >
                       <span className="flex items-center gap-2">
-                        <Flame className="h-4 w-4 text-[#ff7e6b]" aria-hidden /> Tap to view {att.snapSeconds}s Ephemeral Snap
+                        <Flame className="h-4 w-4 text-[var(--accent-terracotta)]" aria-hidden /> Tap to view{' '}
+                        {att.snapSeconds}s Ephemeral Snap
                       </span>
                       <span className="tabular-nums">{att.snapSeconds}s</span>
                     </button>
                   ) : (
-                    <div className="overflow-hidden rounded-lg border border-[#ff7e6b]/50 bg-[#0b1320]">
-                      <div className="flex items-center justify-between bg-[#2b1520] px-2.5 py-1 text-[11px] font-bold text-[#ffb5a8]">
+                    <div className="overflow-hidden rounded-lg border border-[var(--accent-terracotta)] bg-[var(--bg-surface)]">
+                      <div className="flex items-center justify-between bg-[var(--accent-terracotta-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-primary)]">
                         <span className="flex items-center gap-1">
                           <Timer className="h-3.5 w-3.5" aria-hidden /> Ephemeral Snap
                         </span>
@@ -280,9 +307,9 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                     </div>
                   )
                 ) : (
-                  <div className="overflow-hidden rounded-lg border border-[#d8af63]/25 bg-[#0b1320]">
+                  <div className="overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)]">
                     <img src={att.url} alt={att.caption || 'Shared media'} className="max-h-52 w-full object-contain" />
-                    {att.caption && <p className="px-2 py-1 text-[11px] text-[#9eb4ca]">{att.caption}</p>}
+                    {att.caption && <p className="px-2 py-1 text-[11px] text-[var(--text-secondary)]">{att.caption}</p>}
                   </div>
                 )}
               </div>
@@ -295,35 +322,39 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-[#050911]/75"
+      className="fixed inset-0 z-50 flex justify-end bg-[#1A1916]/60"
       role="dialog"
       aria-modal="true"
-      aria-label="Odyssey Community Hub"
+      aria-label="Odyssey Study Community"
     >
-      {/* Clickable dim area to dismiss */}
-      <button type="button" className="hidden flex-1 cursor-default sm:block" onClick={onClose} aria-label="Close Social Hub" />
+      <button
+        type="button"
+        className="hidden flex-1 cursor-default sm:block"
+        onClick={onClose}
+        aria-label="Close Study Community"
+      />
 
-      <aside className="flex h-full w-full max-w-4xl flex-col border-l border-[#d8af63]/40 bg-[#0e1624] text-[#f2e8cf] shadow-2xl">
+      <aside className="flex h-full w-full max-w-4xl flex-col border-l border-[var(--border-strong)] bg-[var(--bg-canvas)] text-[var(--text-primary)] shadow-[var(--shadow-soft)]">
         {/* Top bar */}
-        <header className="flex items-center justify-between border-b border-[#d8af63]/25 bg-[#142034] px-4 py-3">
+        <header className="flex items-center justify-between border-b border-[var(--border-hairline)] bg-[var(--bg-surface)] px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2f8190]/25 text-[#5fb8c4]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-primary-soft)] text-[var(--accent-primary)]">
               <Users className="h-5 w-5" aria-hidden />
             </div>
             <div>
-              <h2 className="font-display text-base font-bold tracking-wide text-[#f1d49a]">
-                Calculus Community Hub
+              <h2 className="font-display text-xl font-bold leading-tight text-[var(--text-primary)]">
+                Study Community
               </h2>
-              <p className="text-xs text-[#9eb4ca]">
-                Interest group chats · 1-on-1 DMs · LaTeX, YouTube, Memes & Ephemeral Snaps
+              <p className="text-xs text-[var(--text-secondary)]">
+                Peer Teach-Back · Interest Groups · 1-on-1 DMs · LaTeX & Media
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-[#d8af63]/30 bg-[#0b1320] p-2 text-[#f0e2bf] hover:border-[#d8af63]"
-            aria-label="Close Social Hub"
+            className="rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-elevated)] p-2 text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+            aria-label="Close Study Community"
           >
             <X className="h-4 w-4" />
           </button>
@@ -331,14 +362,14 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
 
         {/* Main 2-column layout */}
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          {/* Left rail: Rooms / DMs / Peers */}
-          <div className="flex max-h-[36vh] w-full flex-col border-b border-[#d8af63]/20 bg-[#0b1220] md:max-h-none md:w-72 md:border-b-0 md:border-r">
-            <div className="grid grid-cols-3 border-b border-[#d8af63]/20 text-xs font-semibold">
+          {/* Left rail */}
+          <div className="flex max-h-[34vh] w-full flex-col border-b border-[var(--border-hairline)] bg-[var(--bg-surface)] md:max-h-none md:w-72 md:border-b-0 md:border-r">
+            <div className="grid grid-cols-3 border-b border-[var(--border-hairline)] text-xs font-semibold">
               {(
                 [
                   ['groups', 'Groups'],
                   ['dms', 'DMs'],
-                  ['peers', 'Players'],
+                  ['peers', 'Voyagers'],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -346,7 +377,9 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                   type="button"
                   onClick={() => setTab(id)}
                   className={`py-2.5 transition ${
-                    tab === id ? 'border-b-2 border-[#d8af63] bg-[#142034] text-[#f1d49a]' : 'text-[#8da3bc] hover:text-[#f0e2bf]'
+                    tab === id
+                      ? 'border-b-2 border-[var(--accent-gold)] bg-[var(--bg-elevated)] text-[var(--text-primary)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   {label}
@@ -360,50 +393,52 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                   <button
                     type="button"
                     onClick={() => setShowCreateRoom((v) => !v)}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#5fb8c4]/50 bg-[#122638] px-3 py-2 text-xs font-semibold text-[#eafcff] hover:bg-[#18334a]"
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--accent-primary)] bg-[var(--accent-primary-soft)] px-3 py-2 text-xs font-semibold text-[var(--accent-primary)] transition hover:opacity-90"
                   >
-                    <Plus className="h-3.5 w-3.5" /> Create Group Chat
+                    <Plus className="h-3.5 w-3.5" /> Create Study Group
                   </button>
 
                   {showCreateRoom && (
-                    <form onSubmit={handleCreateRoom} className="space-y-2 rounded-lg border border-[#d8af63]/30 bg-[#142034] p-2.5">
+                    <form
+                      onSubmit={handleCreateRoom}
+                      className="space-y-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-elevated)] p-3"
+                    >
                       <input
                         type="text"
                         required
                         value={newRoomName}
                         onChange={(e) => setNewRoomName(e.target.value)}
-                        placeholder="Group name (e.g. u-Sub Speedrunners)"
-                        className="w-full rounded border border-[#d8af63]/25 bg-[#0b1320] px-2.5 py-1.5 text-xs text-[#f5ebd2]"
+                        placeholder="Group name (e.g. u-Sub Navigators)"
+                        className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-xs text-[var(--text-primary)]"
                       />
                       <input
                         type="text"
                         value={newRoomDesc}
                         onChange={(e) => setNewRoomDesc(e.target.value)}
                         placeholder="Short topic description"
-                        className="w-full rounded border border-[#d8af63]/25 bg-[#0b1320] px-2.5 py-1.5 text-xs text-[#f5ebd2]"
+                        className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-xs text-[var(--text-primary)]"
                       />
                       <select
                         value={newRoomCategory}
                         onChange={(e) => setNewRoomCategory(e.target.value)}
                         aria-label="Room category"
-                        className="w-full rounded border border-[#d8af63]/25 bg-[#0b1320] px-2 py-1.5 text-xs text-[#f0e2bf]"
+                        className="w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-2 py-1.5 text-xs text-[var(--text-primary)]"
                       >
-                        <option>Unit 1 · Pre-Calculus</option>
-                        <option>Unit 2 · Limits</option>
-                        <option>Unit 3 · Derivatives</option>
-                        <option>Unit 4 · Applications</option>
-                        <option>Unit 5 · Integrals</option>
-                        <option>Unit 6 · Volumes & Work</option>
-                        <option>Interests · Gaming</option>
-                        <option>Interests · Music</option>
-                        <option>Interests · Creators</option>
+                        <option>Realm I · Foundations</option>
+                        <option>Realm II · Limits</option>
+                        <option>Realm III · Derivatives</option>
+                        <option>Realm IV · Peaks & Optimization</option>
+                        <option>Realm V · Integrals</option>
+                        <option>Realm VI · Volumes & Work</option>
+                        <option>Interests · Gaming & Physics</option>
+                        <option>Interests · Music & Audio</option>
                       </select>
-                      <label className="flex items-center gap-2 text-xs text-[#c9b98a]">
+                      <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                         <input
                           type="checkbox"
                           checked={newRoomPrivate}
                           onChange={(e) => setNewRoomPrivate(e.target.checked)}
-                          className="accent-[#d8af63]"
+                          className="accent-[var(--accent-primary)]"
                         />
                         Private invite-only room
                       </label>
@@ -411,11 +446,14 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                         <button
                           type="button"
                           onClick={() => setShowCreateRoom(false)}
-                          className="rounded px-2.5 py-1 text-xs text-[#9eb4ca] hover:text-white"
+                          className="rounded px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                         >
                           Cancel
                         </button>
-                        <button type="submit" className="rounded bg-[#d8af63] px-3 py-1 text-xs font-bold text-[#141008]">
+                        <button
+                          type="submit"
+                          className="rounded-lg bg-[var(--accent-primary)] px-3 py-1 text-xs font-semibold text-[var(--accent-primary-ink)]"
+                        >
                           Create
                         </button>
                       </div>
@@ -427,8 +465,10 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                     return (
                       <div
                         key={room.id}
-                        className={`rounded-lg border p-2.5 transition ${
-                          selected ? 'border-[#d8af63]/70 bg-[#1a2940]' : 'border-[#d8af63]/15 bg-[#121c2e] hover:border-[#d8af63]/35'
+                        className={`rounded-xl border p-2.5 transition ${
+                          selected
+                            ? 'border-[var(--accent-gold)] bg-[var(--bg-elevated)]'
+                            : 'border-[var(--border-hairline)] bg-[var(--bg-canvas)] hover:border-[var(--border-strong)]'
                         }`}
                       >
                         <button
@@ -440,31 +480,31 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                           className="w-full text-left"
                         >
                           <div className="flex items-center justify-between gap-1">
-                            <span className="flex items-center gap-1.5 text-xs font-bold text-[#f5ebd2]">
+                            <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
                               {room.isPrivate ? (
-                                <Lock className="h-3 w-3 text-[#f1d49a]" aria-hidden />
+                                <Lock className="h-3 w-3 text-[var(--accent-gold)]" aria-hidden />
                               ) : (
-                                <Hash className="h-3.5 w-3.5 text-[#5fb8c4]" aria-hidden />
+                                <Hash className="h-3.5 w-3.5 text-[var(--accent-primary)]" aria-hidden />
                               )}
                               {room.name}
                             </span>
                             {room.unreadCount > 0 && (
-                              <span className="rounded bg-[#d8af63] px-1.5 py-0.5 text-[10px] font-bold text-[#141008]">
+                              <span className="rounded bg-[var(--accent-gold)] px-1.5 py-0.5 text-[10px] font-bold text-[#1A1916]">
                                 {room.unreadCount}
                               </span>
                             )}
                           </div>
-                          <p className="mt-0.5 text-[11px] text-[#8da3bc]">{room.category}</p>
+                          <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{room.category}</p>
                         </button>
                         <div className="mt-2 flex items-center justify-between text-[11px]">
-                          <span className="text-[#8da3bc]">{room.memberIds.length} members</span>
+                          <span className="text-[var(--text-secondary)]">{room.memberIds.length} members</span>
                           <button
                             type="button"
                             onClick={() => repo.toggleJoinRoom(room.id)}
-                            className={`rounded px-2 py-0.5 font-semibold ${
+                            className={`rounded-md px-2 py-0.5 font-semibold ${
                               room.joined
-                                ? 'bg-[#1a3a32] text-[#8de8bd] hover:bg-[#234b41]'
-                                : 'bg-[#2f8190] text-[#eafcff] hover:bg-[#3a96a7]'
+                                ? 'bg-[var(--accent-primary-soft)] text-[var(--accent-primary)]'
+                                : 'bg-[var(--accent-primary)] text-[var(--accent-primary-ink)]'
                             }`}
                           >
                             {room.joined ? 'Joined' : 'Join'}
@@ -489,30 +529,31 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                           setActiveRoomId(room.id);
                           repo.markRoomRead(room.id);
                         }}
-                        className={`flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-left transition ${
-                          selected ? 'border-[#d8af63]/70 bg-[#1a2940]' : 'border-[#d8af63]/15 bg-[#121c2e] hover:border-[#d8af63]/35'
+                        className={`flex w-full items-center gap-2.5 rounded-xl border p-2.5 text-left transition ${
+                          selected
+                            ? 'border-[var(--accent-gold)] bg-[var(--bg-elevated)]'
+                            : 'border-[var(--border-hairline)] bg-[var(--bg-canvas)] hover:border-[var(--border-strong)]'
                         }`}
                       >
                         <span
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                          style={{ backgroundColor: peer?.avatarColor ?? '#2f8190' }}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-[#FAF6EC]"
+                          style={{ backgroundColor: peer?.avatarColor ?? 'var(--accent-primary)' }}
                         >
                           {peer?.initials ?? 'DM'}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-bold text-[#f5ebd2]">{room.name}</span>
-                          <span className="block truncate text-[11px] text-[#8da3bc]">{peer?.currentUnit ?? 'Direct Message'}</span>
-                        </span>
-                        {room.unreadCount > 0 && (
-                          <span className="rounded bg-[#d8af63] px-1.5 py-0.5 text-[10px] font-bold text-[#141008]">
-                            {room.unreadCount}
+                          <span className="block truncate text-xs font-semibold text-[var(--text-primary)]">
+                            {room.name}
                           </span>
-                        )}
+                          <span className="block truncate text-[11px] text-[var(--text-secondary)]">
+                            {peer?.currentUnit ?? 'Direct Message'}
+                          </span>
+                        </span>
                       </button>
                     );
                   })}
-                  <p className="px-1 pt-2 text-[11px] text-[#8da3bc]">
-                    Click any player in the Players tab or inside a group chat to start a private 1-on-1 conversation.
+                  <p className="px-1 pt-2 text-[11px] text-[var(--text-secondary)]">
+                    Select any voyager in the Voyagers tab to start a calm 1-on-1 study chat.
                   </p>
                 </div>
               )}
@@ -524,21 +565,25 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                       key={peer.id}
                       type="button"
                       onClick={() => setSelectedPeer(peer)}
-                      className="flex w-full items-start gap-2.5 rounded-lg border border-[#d8af63]/15 bg-[#121c2e] p-2.5 text-left hover:border-[#5fb8c4]/50"
+                      className="flex w-full items-start gap-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--bg-canvas)] p-2.5 text-left transition hover:border-[var(--accent-primary)]"
                     >
                       <span
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-[#FAF6EC]"
                         style={{ backgroundColor: peer.avatarColor }}
                       >
                         {peer.initials}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-1 text-xs font-bold text-[#f5ebd2]">
+                        <span className="flex items-center justify-between gap-1 text-xs font-semibold text-[var(--text-primary)]">
                           <span>{peer.name}</span>
-                          <span className="text-[10px] font-normal text-[#8da3bc]">{peer.online ? 'Online' : 'Away'}</span>
+                          <span className="text-[10px] font-normal text-[var(--text-secondary)]">
+                            {peer.online ? 'Online' : 'Away'}
+                          </span>
                         </span>
-                        <span className="block text-[11px] text-[#5fb8c4]">{peer.currentUnit}</span>
-                        <span className="mt-1 block truncate text-[11px] text-[#9eb4ca]">{peer.interests.join(' · ')}</span>
+                        <span className="block text-[11px] text-[var(--accent-primary)]">{peer.currentUnit}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-[var(--text-secondary)]">
+                          {peer.interests.join(' · ')}
+                        </span>
                       </span>
                     </button>
                   ))}
@@ -551,57 +596,60 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
           <div className="flex min-h-0 flex-1 flex-col">
             {activeRoom ? (
               <>
-                {/* Room header */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#d8af63]/20 bg-[#111b2c] px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-hairline)] bg-[var(--bg-elevated)] px-4 py-3">
                   <div>
                     <div className="flex items-center gap-2">
                       {activeRoom.kind === 'dm' ? (
-                        <MessageSquare className="h-4 w-4 text-[#5fb8c4]" aria-hidden />
+                        <MessageSquare className="h-4 w-4 text-[var(--accent-primary)]" aria-hidden />
                       ) : activeRoom.isPrivate ? (
-                        <Lock className="h-4 w-4 text-[#f1d49a]" aria-hidden />
+                        <Lock className="h-4 w-4 text-[var(--accent-gold)]" aria-hidden />
                       ) : (
-                        <Globe className="h-4 w-4 text-[#5fb8c4]" aria-hidden />
+                        <Globe className="h-4 w-4 text-[var(--accent-primary)]" aria-hidden />
                       )}
-                      <h3 className="text-sm font-bold text-[#f5ebd2]">{activeRoom.name}</h3>
-                      <span className="text-xs text-[#8da3bc]">· {activeRoom.category}</span>
+                      <h3 className="text-sm font-semibold text-[var(--text-primary)]">{activeRoom.name}</h3>
+                      <span className="text-xs text-[var(--text-secondary)]">· {activeRoom.category}</span>
                     </div>
-                    <p className="mt-0.5 text-xs text-[#9eb4ca]">{activeRoom.description}</p>
+                    <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{activeRoom.description}</p>
                   </div>
                   {activeRoom.kind === 'group' && !activeRoom.joined && (
                     <button
                       type="button"
                       onClick={() => repo.toggleJoinRoom(activeRoom.id)}
-                      className="rounded-lg bg-[#2f8190] px-3 py-1.5 text-xs font-bold text-[#eafcff] hover:bg-[#3a96a7]"
+                      className="rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-primary-ink)]"
                     >
                       Join Group
                     </button>
                   )}
                 </div>
 
-                {/* Peer profile quick card */}
                 {selectedPeer && (
-                  <div className="border-b border-[#5fb8c4]/30 bg-[#132538] px-4 py-3">
+                  <div className="border-b border-[var(--border-hairline)] bg-[var(--bg-surface)] px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
                         <span
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-[#FAF6EC]"
                           style={{ backgroundColor: selectedPeer.avatarColor }}
                         >
                           {selectedPeer.initials}
                         </span>
                         <div>
-                          <p className="text-sm font-bold text-[#f1d49a]">
-                            {selectedPeer.name} <span className="font-normal text-[#9eb4ca]">{selectedPeer.handle} · Age {selectedPeer.age}</span>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">
+                            {selectedPeer.name}{' '}
+                            <span className="font-normal text-[var(--text-secondary)]">
+                              {selectedPeer.handle} · Age {selectedPeer.age}
+                            </span>
                           </p>
-                          <p className="text-xs text-[#5fb8c4]">{selectedPeer.currentUnit}</p>
-                          <p className="mt-1 text-xs text-[#dce7f2]">{selectedPeer.bio}</p>
-                          <p className="mt-1 text-[11px] text-[#9eb4ca]">Interests: {selectedPeer.interests.join(' · ')}</p>
+                          <p className="text-xs text-[var(--accent-primary)]">{selectedPeer.currentUnit}</p>
+                          <p className="mt-1 text-xs text-[var(--text-primary)]">{selectedPeer.bio}</p>
+                          <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                            Interests: {selectedPeer.interests.join(' · ')}
+                          </p>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => setSelectedPeer(null)}
-                        className="text-[#9eb4ca] hover:text-white"
+                        className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                         aria-label="Close profile card"
                       >
                         <X className="h-4 w-4" />
@@ -611,7 +659,7 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                       <button
                         type="button"
                         onClick={() => handleStartDm(selectedPeer)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#d8af63] px-3.5 py-1.5 text-xs font-bold text-[#141008] hover:bg-[#f1d49a]"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-3.5 py-1.5 text-xs font-semibold text-[var(--accent-primary-ink)]"
                       >
                         <MessageSquare className="h-3.5 w-3.5" /> Start Private DM
                       </button>
@@ -619,23 +667,21 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                   </div>
                 )}
 
-                {/* Messages stream */}
                 <div className="scrollbar-thin flex-1 space-y-4 overflow-y-auto p-4">
                   {activeMessages.map(renderMessage)}
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Rich media popovers above composer */}
                 {showLatexBar && (
-                  <div className="border-t border-[#d8af63]/20 bg-[#101a2a] px-4 py-2.5">
+                  <div className="border-t border-[var(--border-hairline)] bg-[var(--bg-surface)] px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] font-semibold text-[#c9b98a]">Quick LaTeX:</span>
+                      <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Quick LaTeX:</span>
                       {LATEX_QUICK_SNIPPETS.map((s) => (
                         <button
                           key={s.label}
                           type="button"
                           onClick={() => setDraftLatex(s.code)}
-                          className="rounded border border-[#d8af63]/30 bg-[#17253a] px-2 py-0.5 text-[11px] text-[#f1d49a] hover:border-[#d8af63]"
+                          className="rounded-md border border-[var(--border-hairline)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-primary)] hover:border-[var(--accent-gold)]"
                         >
                           {s.label}
                         </button>
@@ -646,10 +692,10 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                       value={draftLatex}
                       onChange={(e) => setDraftLatex(e.target.value)}
                       placeholder="LaTeX formula block (e.g. \int_0^1 x^2\,dx = \frac{1}{3})"
-                      className="mt-2 w-full rounded-lg border border-[#d8af63]/30 bg-[#0b1320] px-3 py-1.5 font-mono text-xs text-[#f5ebd2] focus:border-[#d8af63] focus:outline-none"
+                      className="mt-2 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-elevated)] px-3 py-1.5 font-mono text-xs text-[var(--text-primary)]"
                     />
                     {draftLatex.trim() && (
-                      <div className="mt-1.5 rounded border border-[#5fb8c4]/25 bg-[#0b1320] px-3 py-1.5 text-center text-sm text-[#f7ebd0]">
+                      <div className="mt-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-elevated)] px-3 py-1.5 text-center text-sm text-[var(--text-primary)]">
                         <MathText text={`$$${draftLatex}$$`} />
                       </div>
                     )}
@@ -657,10 +703,14 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                 )}
 
                 {showGifPicker && (
-                  <div className="border-t border-[#d8af63]/20 bg-[#101a2a] px-4 py-3">
+                  <div className="border-t border-[var(--border-hairline)] bg-[var(--bg-surface)] px-4 py-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-[#f1d49a]">Calculus Memes & GIFs</p>
-                      <button type="button" onClick={() => setShowGifPicker(false)} className="text-xs text-[#9eb4ca] hover:text-white">
+                      <p className="text-xs font-semibold text-[var(--text-primary)]">Calculus Memes & GIFs</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowGifPicker(false)}
+                        className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      >
                         Close
                       </button>
                     </div>
@@ -673,10 +723,10 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                             setPendingAttachment({ kind: 'gif', url: meme.dataUrl, caption: meme.title });
                             setShowGifPicker(false);
                           }}
-                          className="overflow-hidden rounded-lg border border-[#d8af63]/25 bg-[#0b1320] text-left hover:border-[#5fb8c4]"
+                          className="overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-elevated)] text-left hover:border-[var(--accent-primary)]"
                         >
                           <img src={meme.dataUrl} alt={meme.title} className="h-20 w-full object-cover" />
-                          <p className="truncate px-2 py-1 text-[11px] text-[#e2d7bd]">{meme.title}</p>
+                          <p className="truncate px-2 py-1 text-[11px] text-[var(--text-primary)]">{meme.title}</p>
                         </button>
                       ))}
                     </div>
@@ -686,7 +736,7 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                         value={customGifUrl}
                         onChange={(e) => setCustomGifUrl(e.target.value)}
                         placeholder="Or paste a direct GIF / meme image URL..."
-                        className="flex-1 rounded-lg border border-[#d8af63]/25 bg-[#0b1320] px-2.5 py-1.5 text-xs text-[#f5ebd2]"
+                        className="flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs text-[var(--text-primary)]"
                       />
                       <button
                         type="button"
@@ -696,7 +746,7 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                           setCustomGifUrl('');
                           setShowGifPicker(false);
                         }}
-                        className="rounded-lg bg-[#2f8190] px-3 py-1.5 text-xs font-semibold text-[#eafcff]"
+                        className="rounded-lg bg-[var(--accent-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-primary-ink)]"
                       >
                         Attach
                       </button>
@@ -705,16 +755,16 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                 )}
 
                 {pendingAttachment && (
-                  <div className="flex items-center justify-between gap-3 border-t border-[#5fb8c4]/30 bg-[#112234] px-4 py-2">
+                  <div className="flex items-center justify-between gap-3 border-t border-[var(--border-hairline)] bg-[var(--bg-surface)] px-4 py-2">
                     <div className="flex items-center gap-3">
                       <img src={pendingAttachment.url} alt="" className="h-12 w-16 rounded object-cover" />
                       <div>
-                        <p className="text-xs font-semibold text-[#f5ebd2]">
+                        <p className="text-xs font-semibold text-[var(--text-primary)]">
                           {pendingAttachment.caption || 'Attachment ready'}
                         </p>
                         {pendingAttachment.kind === 'image' && (
-                          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-[#9eb4ca]">
-                            <Timer className="h-3 w-3 text-[#ff8a7a]" aria-hidden />
+                          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+                            <Timer className="h-3 w-3 text-[var(--accent-terracotta)]" aria-hidden />
                             <span>Ephemeral Snap:</span>
                             {([0, 5, 10] as const).map((sec) => (
                               <button
@@ -722,7 +772,9 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                                 type="button"
                                 onClick={() => setSnapTimer(sec)}
                                 className={`rounded px-1.5 py-0.5 font-semibold ${
-                                  snapTimer === sec ? 'bg-[#ff7e6b] text-[#1a0a0c]' : 'bg-[#0b1320] text-[#9eb4ca]'
+                                  snapTimer === sec
+                                    ? 'bg-[var(--accent-terracotta)] text-[#FAF6EC]'
+                                    : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)]'
                                 }`}
                               >
                                 {sec === 0 ? 'Off' : `${sec}s`}
@@ -735,7 +787,7 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                     <button
                       type="button"
                       onClick={() => setPendingAttachment(null)}
-                      className="text-[#9eb4ca] hover:text-white"
+                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       aria-label="Remove attachment"
                     >
                       <X className="h-4 w-4" />
@@ -743,8 +795,8 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                   </div>
                 )}
 
-                {/* Message Composer */}
-                <form onSubmit={handleSend} className="border-t border-[#d8af63]/20 bg-[#111b2c] p-3">
+                {/* Composer */}
+                <form onSubmit={handleSend} className="border-t border-[var(--border-hairline)] bg-[var(--bg-elevated)] p-3">
                   <div className="flex items-center gap-1.5 pb-2">
                     <button
                       type="button"
@@ -754,8 +806,8 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                       }}
                       className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${
                         showLatexBar
-                          ? 'border-[#d8af63] bg-[#d8af63]/20 text-[#f1d49a]'
-                          : 'border-[#d8af63]/20 bg-[#0b1320] text-[#b4c4d6] hover:text-white'
+                          ? 'border-[var(--accent-gold)] bg-[var(--accent-gold-soft)] text-[var(--text-primary)]'
+                          : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                       }`}
                     >
                       <Sigma className="h-3.5 w-3.5" aria-hidden /> LaTeX
@@ -768,8 +820,8 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                       }}
                       className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${
                         showGifPicker
-                          ? 'border-[#d8af63] bg-[#d8af63]/20 text-[#f1d49a]'
-                          : 'border-[#d8af63]/20 bg-[#0b1320] text-[#b4c4d6] hover:text-white'
+                          ? 'border-[var(--accent-gold)] bg-[var(--accent-gold-soft)] text-[var(--text-primary)]'
+                          : 'border-[var(--border-hairline)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                       }`}
                     >
                       <Smile className="h-3.5 w-3.5" aria-hidden /> Meme / GIF
@@ -777,7 +829,7 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1 rounded-md border border-[#d8af63]/20 bg-[#0b1320] px-2 py-1 text-[11px] font-semibold text-[#b4c4d6] hover:text-white"
+                      className="inline-flex items-center gap-1 rounded-md border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     >
                       <Camera className="h-3.5 w-3.5" aria-hidden /> Photo / Snap
                     </button>
@@ -791,8 +843,8 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                         e.target.value = '';
                       }}
                     />
-                    <span className="ml-auto hidden items-center gap-1 text-[11px] text-[#7f97b0] sm:inline-flex">
-                      <ImageIcon className="h-3 w-3" aria-hidden /> Paste YouTube or web links for rich previews
+                    <span className="ml-auto hidden items-center gap-1 text-[11px] text-[var(--text-secondary)] sm:inline-flex">
+                      <ImageIcon className="h-3 w-3" aria-hidden /> Supports $LaTeX$ & YouTube links
                     </span>
                   </div>
 
@@ -801,12 +853,13 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                       type="text"
                       value={draftText}
                       onChange={(e) => setDraftText(e.target.value)}
-                      placeholder={`Message ${activeRoom.name} (supports $LaTeX$, YouTube links, URLs)...`}
-                      className="flex-1 rounded-lg border border-[#d8af63]/30 bg-[#0b1320] px-3 py-2 text-sm text-[#f5ebd2] focus:border-[#d8af63] focus:outline-none"
+                      placeholder={`Share an intuition in ${activeRoom.name}...`}
+                      className="flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none"
                     />
                     <button
                       type="submit"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#d8af63] px-4 py-2 text-xs font-bold text-[#141008] hover:bg-[#f1d49a]"
+                      data-testid="social-send-btn"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-primary)] px-4 py-2 text-xs font-semibold text-[var(--accent-primary-ink)] transition hover:bg-[var(--accent-primary-hover)]"
                     >
                       <Send className="h-3.5 w-3.5" /> Send
                     </button>
@@ -814,7 +867,9 @@ export function SocialDrawer({ repo, open, onClose }: SocialDrawerProps) {
                 </form>
               </>
             ) : (
-              <div className="flex flex-1 items-center justify-center text-sm text-[#8da3bc]">Select a group chat or DM to start talking.</div>
+              <div className="flex flex-1 items-center justify-center text-sm text-[var(--text-secondary)]">
+                Select a study group or DM to begin.
+              </div>
             )}
           </div>
         </div>

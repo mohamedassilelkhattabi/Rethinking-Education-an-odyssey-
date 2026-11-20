@@ -1,11 +1,20 @@
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PORT = Number(process.env.PORT) || 3000;
+function readArg(flag: string): string | undefined {
+  const idx = process.argv.indexOf(flag);
+  if (idx >= 0 && idx + 1 < process.argv.length) return process.argv[idx + 1];
+  const prefix = `${flag}=`;
+  const match = process.argv.find((a) => a.startsWith(prefix));
+  return match ? match.slice(prefix.length) : undefined;
+}
+
+const PORT = Number(readArg('--port') ?? process.env.PORT) || 3000;
+const HOST = readArg('--host') ?? process.env.HOST ?? '0.0.0.0';
 const isProd = process.env.NODE_ENV === 'production';
 
 function getAiClient(): GoogleGenAI | null {
@@ -197,13 +206,152 @@ async function startServer() {
     }
   });
 
+  app.post('/api/ai/personalize-quest', async (req, res) => {
+    const ai = getAiClient();
+    if (!ai) {
+      res.status(503).json({
+        error: 'Live AI personalization is offline (no GEMINI_API_KEY configured). Using curated real-world scenario.',
+        code: 'MISSING_API_KEY',
+      });
+      return;
+    }
+
+    const { quest, profile } = req.body ?? {};
+    if (!quest || !profile) {
+      res.status(400).json({ error: 'Missing quest or compass profile.' });
+      return;
+    }
+
+    const interests = Array.isArray(profile.interests) && profile.interests.length > 0
+      ? profile.interests.slice(0, 8).join(', ')
+      : 'gaming, music production, sports, creative design';
+
+    const prompt = [
+      `Re-skin this Calculus I visual exploration into an authentic, calm, curiosity-driven real-world scenario for a 15–17 year old student.`,
+      `Keep the exact mathematical meaning and physical goal intact — NEVER make it feel like a stressful school exam.`,
+      ``,
+      `Player Compass:`,
+      `- Name: ${profile.displayName || 'Voyager'}`,
+      `- Motivation Archetype: ${profile.archetype || 'explorer'}`,
+      `- Interests: ${interests}`,
+      ``,
+      `Quest Context:`,
+      `- Concept: ${quest.conceptName} (Realm ${quest.realmId})`,
+      `- Original Title: ${quest.title}`,
+      `- Physical Goal: ${quest.physicalGoal}`,
+      `- Symbolic Bridge: ${quest.symbolicEquation}`,
+      `- Intuition: ${quest.symbolicBridgeNote}`,
+      ``,
+      `Rules:`,
+      `1. Ground the story in one of the player's actual interests (e.g., audio synth waveforms, esports trajectories, basketball arcs, video editing curves, robotics).`,
+      `2. Format math cleanly with single $...$ KaTeX delimiters.`,
+      `3. Keep copy concise, warm, respectful, and natural for ages 15–17 (2–3 sentences for story).`,
+    ].join('\n');
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: prompt,
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          systemInstruction:
+            'You are a warm, calm Calculus I experience designer crafting stealth real-world transfer scenarios for teens aged 15-17. Never use test jargon or harsh language.',
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              hookTag: { type: Type.STRING, description: 'Short 2-4 word interest connection label.' },
+              title: { type: Type.STRING, description: 'Natural 4-7 word title.' },
+              story: { type: Type.STRING, description: '2-3 vivid, calm sentences connecting the visual puzzle to the student interest.' },
+              symbolicNote: { type: Type.STRING, description: '1-2 sentences tying the visual motion to the $...$ equation.' },
+              realWorldTakeaway: { type: Type.STRING, description: '1 memorable sentence summarizing the real-world intuition.' },
+            },
+            required: ['hookTag', 'title', 'story', 'symbolicNote', 'realWorldTakeaway'],
+          },
+        },
+      });
+
+      const parsed = JSON.parse((response.text ?? '{}').trim());
+      res.json({
+        skin: {
+          questId: quest.id,
+          hookTag: parsed.hookTag || quest.conceptName,
+          title: parsed.title || quest.title,
+          story: parsed.story || quest.invitation,
+          symbolicNote: parsed.symbolicNote || quest.symbolicBridgeNote,
+          realWorldTakeaway: parsed.realWorldTakeaway || quest.symbolicBridgeNote,
+          source: 'gemini',
+          generatedAt: Date.now(),
+        },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upstream AI error';
+      res.status(502).json({ error: `Could not fetch live AI transfer: ${msg}`, code: 'AI_UPSTREAM_ERROR' });
+    }
+  });
+
+  app.post('/api/ai/oracle-nudge', async (req, res) => {
+    const ai = getAiClient();
+    if (!ai) {
+      res.status(503).json({ error: 'AI Oracle offline', code: 'MISSING_API_KEY' });
+      return;
+    }
+
+    const { questTitle, conceptName, hideFormula, physicalGoal, direction, readout, calmChallengeDial } = req.body ?? {};
+    const prompt = [
+      `Give ONE gentle, calm, curiosity-sparking visual nudge (1-2 short sentences max) for a player experimenting with a Calculus I physics sandbox.`,
+      `Quest: ${questTitle} (${conceptName})`,
+      `Physical Goal: ${physicalGoal}`,
+      `Current State: ${readout} (currently ${direction === 'low' ? 'below target' : direction === 'high' ? 'past target' : 'already aligned'})`,
+      `Scaffolding preference: ${Number(calmChallengeDial) <= 45 ? 'Gentle & reassuring' : 'Light, open-ended curiosity cue'}`,
+      hideFormula
+        ? `CRITICAL: Do NOT mention formulas, equations, or textbook calculus terminology yet — talk purely about the visual motion (waves, ropes, ships, slopes, water).`
+        : `You may gently connect the visual motion to the underlying idea without giving away the raw number.`,
+    ].join('\n');
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: prompt,
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          systemInstruction:
+            'You are a calm Mediterranean navigator offering gentle visual intuition nudges. Zero stress, zero lecturing, max 2 short sentences.',
+        },
+      });
+      res.json({ nudge: (response.text ?? '').trim() });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upstream error';
+      res.status(502).json({ error: msg });
+    }
+  });
+
+  let viteServer: { middlewares: express.RequestHandler; close: () => Promise<void> } | null = null;
+
   if (!isProd) {
-    const { createServer } = await import('vite');
-    const vite = await createServer({
-      server: { middlewareMode: true, hmr: false, allowedHosts: true },
-      appType: 'spa',
+    const viteReady = import('vite').then(({ createServer }) =>
+      createServer({
+        server: { middlewareMode: true, hmr: false, ws: false, allowedHosts: true },
+        appType: 'spa',
+      }),
+    );
+
+    viteReady
+      .then((vite) => {
+        viteServer = vite;
+      })
+      .catch((err) => {
+        console.error('Failed to initialize Vite dev middleware:', err);
+      });
+
+    app.use(async (req, res, next) => {
+      try {
+        const vite = viteServer ?? (await viteReady);
+        vite.middlewares(req, res, next);
+      } catch (err) {
+        next(err);
+      }
     });
-    app.use(vite.middlewares);
   } else {
     const distDir = path.resolve(__dirname, 'dist');
     app.use(express.static(distDir));
@@ -212,9 +360,17 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Odyssey server listening on http://localhost:${PORT}`);
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`Odyssey server listening on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   });
+
+  const shutdown = () => {
+    server.close(() => {
+      Promise.resolve(viteServer?.close()).finally(() => process.exit(0));
+    });
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 startServer().catch((err) => {
